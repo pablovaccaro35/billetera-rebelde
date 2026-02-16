@@ -61,22 +61,75 @@ var PRE=[
   {y:2026,m:2,ahorro:150000,items:[{id:"p163",t:"i",cat:"Sueldo",amt:1455806,note:""},{id:"p164",t:"g",cat:"Ropa Perfumes",amt:38000,note:"MissDior 2/6",cuotas:6,cuotaN:2},{id:"p165",t:"g",cat:"TV Cuotas",amt:17000,note:"ModClix 4/4",cuotas:4,cuotaN:4},{id:"p166",t:"g",cat:"TV Cuotas",amt:14500,note:"Grazia 3/3",cuotas:3,cuotaN:3},{id:"p167",t:"g",cat:"TV Cuotas",amt:25000,note:"TV 1/12",cuotas:12,cuotaN:1},{id:"p168",t:"g",cat:"Servicios",amt:75000,note:"",cuotas:0,cuotaN:0},{id:"p169",t:"g",cat:"Comida",amt:160000,note:"",cuotas:0,cuotaN:0},{id:"p170",t:"g",cat:"Tarjeta RIO",amt:31000,note:"",cuotas:18,cuotaN:13},{id:"p171",t:"g",cat:"Tarjeta GALICIA",amt:265000,note:"",cuotas:0,cuotaN:0},{id:"p172",t:"g",cat:"Madre",amt:265000,note:"",cuotas:0,cuotaN:0},{id:"p173",t:"g",cat:"Alquiler",amt:198000,note:"AIRBNB",cuotas:0,cuotaN:0}]},
 ];
 
+// Auth helpers
+var OWNER_UID="blito"; // Your user ID - only this user gets PRE data
+async function hashPw(pw){var enc=new TextEncoder().encode(pw);var buf=await crypto.subtle.digest("SHA-256",enc);return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,"0")}).join("")}
+function getUsers(){try{return JSON.parse(localStorage.getItem("br2_users")||"{}") }catch(e){return{}}}
+function saveUsers(u){localStorage.setItem("br2_users",JSON.stringify(u))}
+
 function LoginScreen(props){
   var _n=useState(""),nm=_n[0],sNm=_n[1];
+  var _p=useState(""),pw=_p[0],sPw=_p[1];
+  var _m=useState("register"),mode=_m[0],sMode=_m[1];
+  var _e=useState(""),err=_e[0],sErr=_e[1];
   var _l=useState(false),ld=_l[0],sLd=_l[1];
-  function go(){if(nm.trim()){sLd(true);props.onLogin(nm.trim())}}
+
+  async function doRegister(){
+    sErr("");
+    if(!nm.trim()||!pw.trim()){sErr("Completa usuario y contraseña");return}
+    if(pw.length<4){sErr("Minimo 4 caracteres");return}
+    var uid=nm.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
+    if(!uid){sErr("Usuario invalido");return}
+    var users=getUsers();
+    if(users[uid]){sErr("Ese usuario ya existe. Inicia sesion.");return}
+    sLd(true);
+    var h=await hashPw(pw);
+    users[uid]={name:nm.trim(),hash:h};
+    saveUsers(users);
+    props.onLogin(nm.trim(),uid);
+  }
+
+  async function doLogin(){
+    sErr("");
+    if(!nm.trim()||!pw.trim()){sErr("Completa usuario y contraseña");return}
+    var uid=nm.trim().toLowerCase().replace(/[^a-z0-9]/g,"");
+    var users=getUsers();
+    if(!users[uid]){sErr("Usuario no encontrado. Registrate primero.");return}
+    sLd(true);
+    var h=await hashPw(pw);
+    if(users[uid].hash!==h){sLd(false);sErr("Contraseña incorrecta");return}
+    props.onLogin(users[uid].name,uid);
+  }
+
+  function handleKey(e){if(e.key==="Enter"){mode==="login"?doLogin():doRegister()}}
+
+  var inputStyle={width:"100%",padding:"14px 18px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#fff",fontSize:16,outline:"none",boxSizing:"border-box",marginBottom:12};
+
   return(
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(135deg,#0f0c29,#302b63,#24243e)",fontFamily:"system-ui,sans-serif"}}>
-      <div style={{background:"rgba(255,255,255,0.06)",backdropFilter:"blur(20px)",borderRadius:24,padding:"48px 40px",width:360,border:"1px solid rgba(255,255,255,0.1)"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
+      <div style={{background:"rgba(255,255,255,0.06)",backdropFilter:"blur(20px)",borderRadius:24,padding:"48px 40px",width:380,border:"1px solid rgba(255,255,255,0.1)"}}>
+        <div style={{textAlign:"center",marginBottom:28}}>
           <div style={{fontSize:48,marginBottom:8}}>💰🔥</div>
           <h1 style={{color:"#fff",fontSize:28,fontWeight:800,margin:0}}>Billetera Rebelde</h1>
           <p style={{color:"rgba(255,255,255,0.5)",fontSize:14,marginTop:8}}>Tu plata, tus reglas</p>
         </div>
-        <input value={nm} onChange={function(e){sNm(e.target.value)}} onKeyDown={function(e){if(e.key==="Enter")go()}} placeholder="Tu nombre o alias..."
-          style={{width:"100%",padding:"14px 18px",borderRadius:12,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#fff",fontSize:16,outline:"none",boxSizing:"border-box",marginBottom:16}} />
-        <button onClick={go} disabled={!nm.trim()||ld} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:nm.trim()?"linear-gradient(135deg,#6366f1,#8b5cf6)":"rgba(255,255,255,0.1)",color:"#fff",fontSize:16,fontWeight:700,cursor:nm.trim()?"pointer":"default",opacity:nm.trim()?1:0.5}}>
-          {ld?"Cargando...":"Entrar"}</button>
+
+        {/* Mode toggle */}
+        <div style={{display:"flex",marginBottom:20,borderRadius:12,overflow:"hidden",border:"1px solid rgba(255,255,255,0.1)"}}>
+          <button onClick={function(){sMode("login");sErr("")}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:14,fontWeight:600,background:mode==="login"?"rgba(99,102,241,0.3)":"rgba(255,255,255,0.04)",color:mode==="login"?"#fff":"rgba(255,255,255,0.4)"}}>Iniciar sesion</button>
+          <button onClick={function(){sMode("register");sErr("")}} style={{flex:1,padding:"10px",border:"none",cursor:"pointer",fontSize:14,fontWeight:600,background:mode==="register"?"rgba(99,102,241,0.3)":"rgba(255,255,255,0.04)",color:mode==="register"?"#fff":"rgba(255,255,255,0.4)"}}>Registrarse</button>
+        </div>
+
+        <input value={nm} onChange={function(e){sNm(e.target.value)}} onKeyDown={handleKey} placeholder="Usuario" style={inputStyle} autoComplete="username" />
+        <input value={pw} onChange={function(e){sPw(e.target.value)}} onKeyDown={handleKey} placeholder="Contraseña" type="password" style={inputStyle} autoComplete={mode==="register"?"new-password":"current-password"} />
+
+        {err&&<div style={{color:"#ef4444",fontSize:13,marginBottom:12,textAlign:"center"}}>{err}</div>}
+
+        <button onClick={mode==="login"?doLogin:doRegister} disabled={!nm.trim()||!pw.trim()||ld}
+          style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:(nm.trim()&&pw.trim())?"linear-gradient(135deg,#6366f1,#8b5cf6)":"rgba(255,255,255,0.1)",color:"#fff",fontSize:16,fontWeight:700,cursor:(nm.trim()&&pw.trim())?"pointer":"default",opacity:(nm.trim()&&pw.trim())?1:0.5}}>
+          {ld?"Cargando...":(mode==="login"?"Entrar":"Crear cuenta")}</button>
+
+        <p style={{color:"rgba(255,255,255,0.3)",fontSize:11,textAlign:"center",marginTop:16}}>{mode==="login"?"No tenes cuenta? Cambia a Registrarse":"Ya tenes cuenta? Cambia a Iniciar sesion"}</p>
       </div>
     </div>
   );
@@ -210,11 +263,10 @@ export default function App(){
   var _ae=useState(null),assetEdit=_ae[0],setAssetEdit=_ae[1];
   var _lq=useState(0),liqAdj=_lq[0],setLiqAdj=_lq[1];
 
-  function login(name){
-    var uid=name.toLowerCase().replace(/[^a-z0-9]/g,"");
+  function login(name,uid){
     var s=SH(uid);setStorage(s);setUser({name:name,uid:uid});
     Promise.all([s.ld("months",[]),s.ld("recibo",null),s.ld("assets",[]),s.ld("liqAdj",0)]).then(function(res){
-      if(res[0]&&res[0].length>0){setMonths(res[0])}else{var p=PRE.map(function(m){return{y:m.y,m:m.m,ahorro:m.ahorro||0,items:m.items.map(function(i){return Object.assign({},i)})}});setMonths(p);s.sv("months",p)}
+      if(res[0]&&res[0].length>0){setMonths(res[0])}else if(uid===OWNER_UID){var p=PRE.map(function(m){return{y:m.y,m:m.m,ahorro:m.ahorro||0,items:m.items.map(function(i){return Object.assign({},i)})}});setMonths(p);s.sv("months",p)}else{setMonths([])}
       if(res[1])setRecibo(res[1]);
       if(res[2])setAssets(res[2]);
       if(res[3])setLiqAdj(res[3]);
@@ -349,7 +401,7 @@ export default function App(){
     });
   },[months,projN]);
 
-  if(!user)return <LoginScreen onLogin={login} />;
+  if(!user)return <LoginScreen onLogin={function(name,uid){login(name,uid)}} />;
   if(!loaded)return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0f0c29",color:"#fff",fontFamily:"sans-serif"}}>Cargando...</div>;
 
   var chartLast6=summaries.slice(-6).map(function(x){return{name:x.label,Ingresos:x.inc,Gastos:x.exp,Saldo:x.bal}});
@@ -729,4 +781,3 @@ export default function App(){
     </div>
   );
 }
-
